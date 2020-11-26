@@ -84,12 +84,21 @@ while (( "$#" )); do
             shift 2
             ;;
         -h|--help)
-            echo "Help" >&2
+            echo
+            echo "Usage:"
+            echo "        -P|--project: Project name to deploy or update. Valid projects names are:"
+            echo "                    * powpeg-node "
+            echo "                    * token-bridge "
+            echo
+            echo "        -d|--destination: Destination directory to update or to clone a new install."
+            echo "                          If is a new install, the directory should not exists."
+            echo           
+            echo "        -h|--help: Show this help."
+            echo
             quit 0
             ;;
         *)
-            echo $#
-            quit 1
+            quit 1 "No valid parameter use -h for help"
             ;;
     esac
 done
