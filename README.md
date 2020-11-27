@@ -7,20 +7,21 @@
   * gnupg >= 2.2.19
   * curl
   * git
-  * npm (only for the token bridge project)
   * docker
 
 * Authenticated GitHub user with read permissions into the repositories and a ssh access configured for that account.
 
 ## Usage
 
-`./deploy.sh -P PROJECT_NAME -d DESTINATION`
+### Install
 
-### Available project names
+`./deploy.sh -P PROJECT_NAME -a install`
 
-* rskj (used for testing, will be removed)
-* powpeg-node-setup
-* tokenbridge
+
+### Update
+
+`./deploy.sh -a update`
+
 
 ## Future versions
 

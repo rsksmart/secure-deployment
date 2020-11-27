@@ -1,9 +1,11 @@
 #!/bin/bash
 
 PROJECT=""
-DEST=""
+PROJECT_NAME=""
+ACTION=""
+PROGRAMS="git gpg curl docker"
 BASE_URL="git@github.com:"
-UPDATE=0
+UPDATE=1
 CURRENT_DIR=$(pwd)
 KEY="https://github.com/aeidelman.gpg"
 EXPECTED="0CA5791C49C9BA9C85EC53EC307E18F7DC0D4A1A"
@@ -18,64 +20,43 @@ quit() {
     exit $1
 }
 
-requirements() {
-    echo "Checking requirements ... "
-    which gpg > /dev/null 2>&1 &&
-        which curl > /dev/null 2>&1 &&
-        which git > /dev/null 2>&1 &&
-        which docker > /dev/null 2>&1 &&
-        return 0
-    quit 1 "Requirements not acomplished"
-}
-
-require_node() {
-    which npm > /dev/null 2>&1 &&
-        which node > /dev/null 2>&1 &&
-        return 0
-    quit 1 "Requirements not acomplished"
+check_required_programs() {
+    echo "Checking for required software..."
+    rc=0
+    for program in $PROGRAMS; do
+        if ! command -v "$program" >/dev/null 2>&1; then
+            rc=1
+            echo "$program: command not found"
+        fi
+    done
+    if [ $rc -ne 0 ]; then
+        quit 1 "Requirements not acomplished"
+    fi
 }
 
 project(){
-    case "$1" in
-        powpeg-node )
-            BASE_URL=$BASE_URL"rootstock/powpeg-node-setup"
-            requirements
-            ;;
-        token-bridge )
-            BASE_URL=$BASE_URL"rsksmart/tokenbridge"
-            requirements &&
-                require_node
-            ;;
-        rskj )
-            BASE_URL=$BASE_URL"rsksmart/rskj"
-            requirements
-            ;;
-        *)
-            quit 1 "Project does not exists"
-            ;;
-    esac
+    PROJECT_NAME=$(echo $PROJECT | cut -f2 -d"/")
+}
+
+repo_name(){
+    BASE_URL=$BASE_URL$PROJECT
 }
 
 valid_repo(){
-    echo "Validating repository in destination ..."
-    CURRENT_REPO_URL=$(git config --get remote.origin.url)
-    if [ "$BASE_URL" = "$CURRENT_REPO_URL" ]; then
-        echo "Repository Validated."
-        return 0
-    fi
-    return 1
+    echo "Validating repository for $PROJECT_NAME ..."
+    git rev-parse --git-dir > /dev/null 2>&1
 }
 
 download_pubkey(){
-    echo "Downloading Signature ..."
+    echo "Downloading Key ..."
     gpg --keyserver $KEY --recv-keys $EXPECTED &&
-        echo "Signature donwloaded and verified" &&
+        echo "Key donwloaded and verified" &&
         return 0
     quit 1 "A problem ocurred downloading the gpg key. Please verify"
 }
 
 verify_tag(){
-    echo "Verifing tags ... "
+    echo "Verifying tags ... "
     LATEST_TAG=$(git describe --abbrev=0)
     RESULT=$?
     if [ $RESULT -eq 0 ] && [[ "${LATEST_TAG}" =~ ^[A-Z]+\-[0-9].[0-9].[0-9]$ ]]; then
@@ -93,25 +74,58 @@ verify_tag(){
     quit 1 "There are not tags in the repository"
 }
 
+clone() {
+    echo $PROJECT_NAME >> $CURRENT_DIR/.packages
+    mkdir -p $PROJECT_NAME &&
+        echo "Cloning repo ..." &&
+        git clone $BASE_URL $PROJECT_NAME > /dev/null 2>&1 &&
+        cd $CURRENT_DIR/$PROJECT_NAME
+        return 0
+    quit 1 "It wasn't possible to clone the repo into the destination directory. Please check and try again."
+}
+
+validate_action() {
+    case "$ACTION" in
+        install)
+            UPDATE=1
+            ;;
+        update)
+            UPDATE=0
+            ;;
+        *)
+            quit 1 "Invalid action. Use --help for help."
+            ;;
+    esac
+}
+
+deploy(){
+    verify_tag &&
+        bash ./deploy.sh $UPDATE $CURRENT_DIR/$PROJECT_NAME &&
+        quit 0 "Done."
+    quit 1 "There was a problem running the deploy"
+}
+
 while (( "$#" )); do
     case "$1" in
         -P|--project)
             PROJECT=$2
+            project
             shift 2
             ;;
-        -d|--destination)
-            DEST=$2
+        -a|--action)
+            ACTION=$2
+            validate_action
             shift 2
             ;;
         -h|--help)
             echo
             echo "Usage:"
-            echo "        -P|--project: Project name to deploy or update. Valid projects names are:"
-            echo "                    * powpeg-node "
-            echo "                    * token-bridge "
+            echo "        -P|--project: Project repo to deploy or update. Must be a valid GitHub repo like for example:"
+            echo "                    * rsksmart/token-bridge "
             echo
-            echo "        -d|--destination: Destination directory to update or to clone a new install."
-            echo "                          If is a new install, the directory should not exists."
+            echo "        -a|--action: Action to perform. Valid actions are:"
+            echo "                    * install"
+            echo "                    * update"
             echo           
             echo "        -h|--help: Show this help."
             echo
@@ -123,37 +137,29 @@ while (( "$#" )); do
     esac
 done
 
+[ $UPDATE -eq 1 ] &&
+    [ -z "$PROJECT" ] &&
+    quit 1 "Missing project. Use --help for help."
 
-if [ -z "${PROJECT}" ] || [ -z "${DEST}" ]; then
-    quit 1 "Project or Destination are empty, please check it."
-fi
-
-project $PROJECT
+check_required_programs
 download_pubkey
 
-if [ -d $DEST ]; then
-    if git -C $DEST rev-parse > /dev/null 2>&1 ; then
-        UPDATE=1
-    fi
-    if [ $UPDATE -eq 1 ]; then
-        echo "Entering in update mode"
-        cd $DEST
+if [ $UPDATE -eq 0 ]; then
+    for pkg in $(sort -u <"$CURRENT_DIR/.packages"); do
+        PROJECT_NAME=$pkg
+        repo_name
+        cd $CURRENT_DIR/$PROJECT_NAME
         if valid_repo ; then
-            git fetch --tags
-            verify_tag
+            git fetch --tags &&
+                deploy
         else
-            quit 1 "Invalid repository in directory $DEST for project $PROJECT"
+            quit 1 "Invalid repository in directory $CURRENT_DIR/$PROJECT_NAME for project $PROJECT_NAME"
         fi
-    fi
+    done
 fi
 
-if [ $UPDATE -eq 0 ]; then
-    echo "Entering in install mode"
-    mkdir -p $DEST &&
-        echo "Cloning repo ..." &&
-        git clone $BASE_URL $DEST > /dev/null 2>&1 &&
-        cd $DEST &&
-        verify_tag &&
-        quit 0 "Ready to rumble"
-    quit 1 "It wasn't possible to create the destination directory. Please remove the existing directory and try again."
+if [ $UPDATE -eq 1 ]; then
+    repo_name
+    clone &&
+        deploy
 fi
