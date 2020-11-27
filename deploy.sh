@@ -5,9 +5,8 @@ DEST=""
 BASE_URL="git@github.com:"
 UPDATE=0
 CURRENT_DIR=$(pwd)
-KEY="https://github.com/bcodesido.gpg"
-EXPECTED="4EEB29E6302683DAE604DB9A43B7043F78302339"
-EXPECTED_="0CA5791C49C9BA9C85EC53EC307E18F7DC0D4A1A"
+KEY="https://github.com/aeidelman.gpg"
+EXPECTED="0CA5791C49C9BA9C85EC53EC307E18F7DC0D4A1A"
 
 quit() {
     cd $CURRENT_DIR
@@ -80,7 +79,7 @@ verify_tag(){
     LATEST_TAG=$(git describe --abbrev=0)
     RESULT=$?
     if [ $RESULT -eq 0 ] && [[ "${LATEST_TAG}" =~ ^[A-Z]+\-[0-9].[0-9].[0-9]$ ]]; then
-        VALID=$(git verify-tag --raw "$LATEST_TAG" 2>&1 | grep VALIDSIG |awk '{print $12}' | grep -c $EXPECTED_)
+        VALID=$(git verify-tag --raw "$LATEST_TAG" 2>&1 | grep VALIDSIG |awk '{print $12}' | grep -c $EXPECTED)
         if [ $VALID -eq 1 ]; then
             echo "Tag verified"
             echo "Moving into tag ..."
