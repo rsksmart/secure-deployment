@@ -19,16 +19,37 @@ quit() {
     exit $1
 }
 
+requirements() {
+    echo "Checking requirements ... "
+    which gpg > /dev/null 2>&1 &&
+        which curl > /dev/null 2>&1 &&
+        which git > /dev/null 2>&1 &&
+        which docker > /dev/null 2>&1 &&
+        return 0
+    quit 1 "Requirements not acomplished"
+}
+
+require_node() {
+    which npm > /dev/null 2>&1 &&
+        which node > /dev/null 2>&1 &&
+        return 0
+    quit 1 "Requirements not acomplished"
+}
+
 project(){
     case "$1" in
         powpeg-node )
             BASE_URL=$BASE_URL"rootstock/powpeg-node-setup"
+            requirements
             ;;
         token-bridge )
             BASE_URL=$BASE_URL"rsksmart/tokenbridge"
+            requirements &&
+                require_node
             ;;
         rskj )
             BASE_URL=$BASE_URL"rsksmart/rskj"
+            requirements
             ;;
         *)
             quit 1 "Project does not exists"
