@@ -57,7 +57,7 @@ download_pubkey(){
 
 verify_tag(){
     echo "Verifying tags ... "
-    LATEST_TAG=$(git describe --abbrev=0)
+    LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
     RESULT=$?
     if [ $RESULT -eq 0 ] && [[ "${LATEST_TAG}" =~ ^[A-Z]+\-[0-9].[0-9].[0-9]$ ]]; then
         VALID=$(git verify-tag --raw "$LATEST_TAG" 2>&1 | grep VALIDSIG |awk '{print $12}' | grep -c $EXPECTED)
